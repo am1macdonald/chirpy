@@ -44,6 +44,9 @@ func middlewareCors(next http.Handler) http.Handler {
 	})
 }
 
+func jsonResponse(w http.ResponseWriter, code int, payload interface{}) {}
+func errorResponse(w http.ResponseWriter, code int, msg string)
+
 func init() {
 	config = apiConfig{}
 	mux = *http.NewServeMux()
