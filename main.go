@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+
+	"github.com/am1macdonald/chirpy/internal/payloads"
+	"github.com/am1macdonald/chirpy/internal/validate"
 )
 
 var mux http.ServeMux
@@ -44,8 +46,22 @@ func middlewareCors(next http.Handler) http.Handler {
 	})
 }
 
-func jsonResponse(w http.ResponseWriter, code int, payload interface{}) {}
-func errorResponse(w http.ResponseWriter, code int, msg string)
+func jsonResponse(w http.ResponseWriter, code int, payload interface{}) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	w.Write(data)
+}
+
+func errorResponse(w http.ResponseWriter, code int, msg string) {
+	w.WriteHeader(code)
+	w.Write([]byte(msg))
+	return
+}
 
 func init() {
 	config = apiConfig{}
@@ -91,39 +107,21 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Validating chirp")
-		type requestBody struct {
-			Body string `json:"body"`
-		}
-		type responsePayload struct {
-			Error string `json:"error,omitempty"`
-			Valid bool   `json:"valid,omitempty"`
-		}
-		decoder := json.NewDecoder(r.Body)
-		req := requestBody{}
-		err := decoder.Decode(&req)
+		req, err := payloads.DecodeRequest(r)
 		if err != nil {
-			log.Printf("Error decoding request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
+			errorResponse(w, 500, "failed to decode the request")
 			return
 		}
-		log.Printf("%s", req.Body)
-		res := responsePayload{}
-		if len(req.Body) > 140 {
-			w.WriteHeader(400)
-			res.Error = "Chirp is too long"
+		res := payloads.ResponsePayload{}
+		s, err := validate.Validate(req.Body)
+		if err != nil {
+			res.Body = s
+			jsonResponse(w, 400, res)
+			return
 		} else {
-			w.WriteHeader(http.StatusOK)
-			res.Valid = true
+			res.CleanedBody = s
 		}
-		data, err := json.Marshal(res)
-		if err != nil {
-			log.Printf("Error encoding request: %s", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		w.Write(data)
+		jsonResponse(w, 200, res)
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
