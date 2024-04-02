@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/am1macdonald/chirpy/internal/payloads"
-	"github.com/am1macdonald/chirpy/internal/validate"
 )
 
 var mux http.ServeMux
@@ -106,22 +103,30 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-		req, err := payloads.DecodeRequest(r)
-		if err != nil {
-			errorResponse(w, 500, "failed to decode the request")
-			return
-		}
-		res := payloads.ResponsePayload{}
-		s, err := validate.Validate(req.Body)
-		if err != nil {
-			res.Body = s
-			jsonResponse(w, 400, res)
-			return
-		} else {
-			res.CleanedBody = s
-		}
-		jsonResponse(w, 200, res)
+	// mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
+	// 	req, err := payloads.DecodeRequest(r)
+	// 	if err != nil {
+	// 		errorResponse(w, 500, "failed to decode the request")
+	// 		return
+	// 	}
+	// 	res := payloads.ResponsePayload{}
+	// 	s, err := validate.Validate(req.Body)
+	// 	if err != nil {
+	// 		res.Body = s
+	// 		jsonResponse(w, 400, res)
+	// 		return
+	// 	} else {
+	// 		res.CleanedBody = s
+	// 	}
+	// 	jsonResponse(w, 200, res)
+	// })
+	//
+
+	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+
+	})
+
+	mux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
