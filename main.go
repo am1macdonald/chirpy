@@ -3,7 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+
+	"github.com/am1macdonald/chirpy/internal/database"
+	"github.com/am1macdonald/chirpy/internal/payloads"
+	"github.com/am1macdonald/chirpy/internal/validate"
 )
 
 var mux http.ServeMux
@@ -14,6 +19,8 @@ var config apiConfig
 const (
 	port string = ":8080"
 )
+
+var db *database.DB
 
 type apiConfig struct {
 	fileServerHits int
@@ -67,6 +74,11 @@ func init() {
 	server = http.Server{}
 	server.Addr = port
 	server.Handler = corsMux
+	dbp, err := database.NewDB()
+	if err != nil {
+		log.Fatalln("Failed to load database")
+	}
+	db = dbp
 }
 
 func main() {
@@ -123,6 +135,21 @@ func main() {
 	//
 
 	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		req, err := payloads.DecodeRequest(r)
+		if err != nil {
+			errorResponse(w, 500, "failed to decode the request")
+			return
+		}
+		s, err := validate.Validate(req.Body)
+		if err != nil {
+			jsonResponse(w, 400, err.Error())
+			return
+		}
+		chirp, err := db.CreateChirp(s)
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
+		jsonResponse(w, 201, chirp)
 
 	})
 

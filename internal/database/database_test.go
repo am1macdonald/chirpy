@@ -7,6 +7,10 @@ import (
 	"github.com/am1macdonald/chirpy/internal/database"
 )
 
+var (
+	db *database.DB
+)
+
 func beforeEach() (*database.DB, error) {
 	os.Remove("../../database.json")
 	return database.NewDB()
@@ -24,17 +28,18 @@ func TestCreateDatabase(t *testing.T) {
 	}
 }
 
-// gets a new chirp from the create chirp function
+// gets a new chirp from the create chirp function & tests reading chirps
 func TestCreateChirp(t *testing.T) {
 	db, err := beforeEach()
 	chirp, err := db.CreateChirp("wow a chirp!")
 	if chirp == nil || err != nil {
 		t.Fatalf("Test 'CreateChirp' failed: %s", err.Error())
 	}
-}
-
-// read chirp
-// reads a chirp from the database
-func TestReadChirp(t *testing.T) {
-
+	chirps, err := db.GetChirps()
+	if err != nil {
+		t.Fatalf("Test 'CreateChirp' failed: %s", err.Error())
+	}
+	if len(chirps) < 1 {
+		t.Fatalf("Test 'CreateChirp' failed: expected one chirp, got %d", len(chirps))
+	}
 }

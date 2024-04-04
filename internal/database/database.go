@@ -11,6 +11,7 @@ const (
 )
 
 type Chirp struct {
+	ID   int    `json:"id"`
 	Body string `json:"body"`
 }
 
@@ -24,8 +25,8 @@ type DBStructure struct {
 }
 
 func (db *DB) ensureDB() error {
-	_, err := os.ReadFile(dbPath)
-	if err != nil {
+	err := os.Remove(dbPath)
+	if err == nil {
 		_, err = os.Create(dbPath)
 		if err != nil {
 			return err
@@ -36,6 +37,8 @@ func (db *DB) ensureDB() error {
 		if err != nil {
 			return err
 		}
+	} else {
+		return err
 	}
 	return nil
 }
@@ -76,13 +79,26 @@ func (db *DB) CreateChirp(body string) (*Chirp, error) {
 	}
 	chirp := Chirp{
 		Body: body,
+		ID:   len(dbs.Chirps) + 1,
 	}
-	dbs.Chirps[len(dbs.Chirps)+1] = chirp
+	dbs.Chirps[chirp.ID] = chirp
 	err = db.writeDB(*dbs)
 	if err != nil {
 		return nil, err
 	}
 	return &chirp, nil
+}
+
+func (db *DB) GetChirps() ([]Chirp, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	chirps := []Chirp{}
+	for _, val := range dbs.Chirps {
+		chirps = append(chirps, val)
+	}
+	return chirps, nil
 }
 
 func NewDB() (*DB, error) {
