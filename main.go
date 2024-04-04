@@ -150,10 +150,14 @@ func main() {
 			jsonResponse(w, 500, err.Error())
 		}
 		jsonResponse(w, 201, chirp)
-
 	})
 
 	mux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
+		chirps, err := db.GetChirps()
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
+		jsonResponse(w, 200, chirps)
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)

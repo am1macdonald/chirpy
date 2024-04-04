@@ -39,7 +39,7 @@ func TestCreateChirp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Test 'CreateChirp' failed: %s", err.Error())
 	}
-	if len(chirps) < 1 {
+	if len(chirps) != 1 {
 		t.Fatalf("Test 'CreateChirp' failed: expected one chirp, got %d", len(chirps))
 	}
 }

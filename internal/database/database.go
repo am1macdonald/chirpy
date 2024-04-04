@@ -2,12 +2,13 @@ package database
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"sync"
 )
 
 const (
-	dbPath = "../../database.json"
+	dbPath = "./database.json"
 )
 
 type Chirp struct {
@@ -25,8 +26,9 @@ type DBStructure struct {
 }
 
 func (db *DB) ensureDB() error {
-	err := os.Remove(dbPath)
-	if err == nil {
+	f, err := os.ReadFile(dbPath)
+	log.Print(f)
+	if err != nil {
 		_, err = os.Create(dbPath)
 		if err != nil {
 			return err
@@ -37,8 +39,6 @@ func (db *DB) ensureDB() error {
 		if err != nil {
 			return err
 		}
-	} else {
-		return err
 	}
 	return nil
 }
