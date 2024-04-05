@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/am1macdonald/chirpy/internal/database"
 	"github.com/am1macdonald/chirpy/internal/payloads"
@@ -158,6 +159,26 @@ func main() {
 			jsonResponse(w, 500, err.Error())
 		}
 		jsonResponse(w, 200, chirps)
+	})
+
+	mux.HandleFunc("GET /api/chirps/{chirp_id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(r.PathValue("chirp_id"))
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
+		chirp, err := db.GetChirp(id)
+		if err != nil {
+			jsonResponse(w, 404, err.Error())
+		}
+		jsonResponse(w, 200, chirp)
+	})
+
+	mux.HandleFunc("POST /api/users", func(w http.ResponseWriter, r *http.Request) {
+		req := payloads.UsersPostBody{}
+		err := payloads.DecodeRequest(r, &req)
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)

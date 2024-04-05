@@ -9,20 +9,24 @@ import (
 type RequestBody struct {
 	Body string `json:"body"`
 }
+
 type ResponsePayload struct {
 	Body        string `json:"body,omitempty"`
 	CleanedBody string `json:"cleaned_body,omitempty"`
 }
 
-func DecodeRequest(r *http.Request) (*RequestBody, error) {
+type UsersPostBody struct {
+	Email string `json:"email"`
+}
+
+func DecodeRequest[T any](r *http.Request, dest *T) error {
 	decoder := json.NewDecoder(r.Body)
-	req := RequestBody{}
-	err := decoder.Decode(&req)
+	err := decoder.Decode(&dest)
 	if err != nil {
 		log.Printf("Error decoding request: %s", err)
-		return nil, err
+		return err
 	}
-	return &req, nil
+	return nil
 }
 
 func EncodeResponse(res ResponsePayload) ([]byte, error) {

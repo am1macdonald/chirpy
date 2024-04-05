@@ -2,6 +2,7 @@ package database
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"sync"
@@ -16,6 +17,11 @@ type Chirp struct {
 	Body string `json:"body"`
 }
 
+type User struct {
+	ID    int    `json:"id"`
+	Email string `json:"email"`
+}
+
 type DB struct {
 	path string
 	mu   sync.Mutex
@@ -23,6 +29,7 @@ type DB struct {
 
 type DBStructure struct {
 	Chirps map[int]Chirp `json:"chirps"`
+	Users  map[int]User  `json:"users"`
 }
 
 func (db *DB) ensureDB() error {
@@ -99,6 +106,19 @@ func (db *DB) GetChirps() ([]Chirp, error) {
 		chirps = append(chirps, val)
 	}
 	return chirps, nil
+}
+
+func (db *DB) GetChirp(id int) (*Chirp, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	val, ok := dbs.Chirps[id]
+	if !ok {
+		return nil, errors.New("Chirp not found in database")
+	}
+
+	return &val, nil
 }
 
 func NewDB() (*DB, error) {
