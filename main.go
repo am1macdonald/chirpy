@@ -184,7 +184,11 @@ func main() {
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
 		}
-		jsonResponse(w, 201, user)
+		pl := payloads.CreateUserResponse{
+			ID:    user.ID,
+			Email: user.Email,
+		}
+		jsonResponse(w, 201, pl)
 	})
 
 	mux.HandleFunc("GET /api/users/{user_id}", func(w http.ResponseWriter, r *http.Request) {

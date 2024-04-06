@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"sync"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -126,10 +128,14 @@ func (db *DB) CreateUser(email string, password string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 4)
+	if err != nil {
+		return nil, err
+	}
 	user := User{
 		Email:    email,
 		ID:       len(dbs.Users) + 1,
-		Password: password,
+		Password: string(hash),
 	}
 	dbs.Users[user.ID] = user
 	err = db.writeDB(*dbs)

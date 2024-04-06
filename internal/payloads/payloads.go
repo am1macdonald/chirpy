@@ -20,6 +20,11 @@ type UsersPostBody struct {
 	Password string `json:"password"`
 }
 
+type CreateUserResponse struct {
+	Email string `json:"email"`
+	ID    int    `json:"id"`
+}
+
 func DecodeRequest[T any](r *http.Request, dest *T) error {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&dest)
