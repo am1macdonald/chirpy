@@ -17,8 +17,9 @@ type Chirp struct {
 }
 
 type User struct {
-	ID    int    `json:"id"`
-	Email string `json:"email"`
+	ID       int    `json:"id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 type DB struct {
@@ -120,14 +121,15 @@ func (db *DB) GetChirp(id int) (*Chirp, error) {
 	return &val, nil
 }
 
-func (db *DB) CreateUser(email string) (*User, error) {
+func (db *DB) CreateUser(email string, password string) (*User, error) {
 	dbs, err := db.loadDB()
 	if err != nil {
 		return nil, err
 	}
 	user := User{
-		Email: email,
-		ID:    len(dbs.Users) + 1,
+		Email:    email,
+		ID:       len(dbs.Users) + 1,
+		Password: password,
 	}
 	dbs.Users[user.ID] = user
 	err = db.writeDB(*dbs)

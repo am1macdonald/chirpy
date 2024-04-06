@@ -180,7 +180,7 @@ func main() {
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
 		}
-		user, err := db.CreateUser(req.Email)
+		user, err := db.CreateUser(req.Email, req.Password)
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
 		}
