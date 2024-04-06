@@ -136,7 +136,8 @@ func main() {
 	//
 
 	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		req, err := payloads.DecodeRequest(r)
+		req := payloads.ChripPostBody{}
+		err := payloads.DecodeRequest(r, &req)
 		if err != nil {
 			errorResponse(w, 500, "failed to decode the request")
 			return
@@ -179,6 +180,23 @@ func main() {
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
 		}
+		user, err := db.CreateUser(req.Email)
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
+		jsonResponse(w, 201, user)
+	})
+
+	mux.HandleFunc("GET /api/users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(r.PathValue("user_id"))
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+		}
+		chirp, err := db.GetUser(id)
+		if err != nil {
+			jsonResponse(w, 404, err.Error())
+		}
+		jsonResponse(w, 200, chirp)
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)

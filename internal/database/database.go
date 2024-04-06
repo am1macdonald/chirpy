@@ -3,7 +3,6 @@ package database
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"sync"
 )
@@ -33,8 +32,7 @@ type DBStructure struct {
 }
 
 func (db *DB) ensureDB() error {
-	f, err := os.ReadFile(dbPath)
-	log.Print(f)
+	_, err := os.ReadFile(dbPath)
 	if err != nil {
 		_, err = os.Create(dbPath)
 		if err != nil {
@@ -42,6 +40,7 @@ func (db *DB) ensureDB() error {
 		}
 		err = db.writeDB(DBStructure{
 			Chirps: map[int]Chirp{},
+			Users:  map[int]User{},
 		})
 		if err != nil {
 			return err
@@ -118,6 +117,35 @@ func (db *DB) GetChirp(id int) (*Chirp, error) {
 		return nil, errors.New("Chirp not found in database")
 	}
 
+	return &val, nil
+}
+
+func (db *DB) CreateUser(email string) (*User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	user := User{
+		Email: email,
+		ID:    len(dbs.Users) + 1,
+	}
+	dbs.Users[user.ID] = user
+	err = db.writeDB(*dbs)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (db *DB) GetUser(id int) (*User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	val, ok := dbs.Users[id]
+	if !ok {
+		return nil, errors.New("User not found in database")
+	}
 	return &val, nil
 }
 
