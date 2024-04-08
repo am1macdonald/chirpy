@@ -2,3 +2,6 @@ database.json
 out
 out
 .env
+tmp/main
+tmp
+.air.toml
