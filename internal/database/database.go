@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,6 +25,27 @@ type User struct {
 	ID       int    `json:"id"`
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+func (u *User) Validate(password string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
+	return err == nil
+}
+
+func (u *User) GetToken(secret string, expiresIn int) (string, error) {
+	var expiry time.Time
+	if expiresIn == 0 || (time.Duration(time.Second*time.Duration(expiresIn)) > time.Duration(time.Hour*24)) {
+		expiry = time.Now().Add(time.Duration(time.Hour * 24))
+	} else {
+		expiry = time.Now().Add(time.Duration(expiresIn))
+	}
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(expiry),
+		Issuer:    "chirpy",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Subject:   strconv.Itoa(u.ID),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
 }
 
 type DB struct {
@@ -119,7 +143,6 @@ func (db *DB) GetChirp(id int) (*Chirp, error) {
 	if !ok {
 		return nil, errors.New("Chirp not found in database")
 	}
-
 	return &val, nil
 }
 
@@ -128,21 +151,25 @@ func (db *DB) CreateUser(email string, password string) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
+	user, err := db.GetUserByEmail(email)
+	if err == nil && user != nil {
+		return nil, errors.New("User already exists")
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 4)
 	if err != nil {
 		return nil, err
 	}
-	user := User{
+	user = &User{
 		Email:    email,
 		ID:       len(dbs.Users) + 1,
 		Password: string(hash),
 	}
-	dbs.Users[user.ID] = user
+	dbs.Users[user.ID] = *user
 	err = db.writeDB(*dbs)
 	if err != nil {
 		return nil, err
 	}
-	return &user, nil
+	return user, nil
 }
 
 func (db *DB) GetUser(id int) (*User, error) {
@@ -155,6 +182,32 @@ func (db *DB) GetUser(id int) (*User, error) {
 		return nil, errors.New("User not found in database")
 	}
 	return &val, nil
+}
+
+func (db *DB) GetUserByEmail(email string) (*User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range dbs.Users {
+		if v.Email == email {
+			return &v, nil
+		}
+	}
+	return nil, errors.New("User not found")
+}
+
+func (db *DB) UpdateUser(id int, u *User) (*User, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return nil, err
+	}
+	dbs.Users[id] = *u
+	err = db.writeDB(*dbs)
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
 }
 
 func NewDB() (*DB, error) {
