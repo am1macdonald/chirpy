@@ -25,6 +25,18 @@ type CreateUserResponse struct {
 	ID    int    `json:"id"`
 }
 
+type LoginRequest struct {
+	Email            string `json:"email"`
+	Password         string `json:"password"`
+	ExpiresInSeconds int    `json:"expires_in_seconds,omitempty"`
+}
+
+type LoginResponse struct {
+	ID    int    `json:"id"`
+	Email string `json:"email"`
+	Token string `json:"token"`
+}
+
 func DecodeRequest[T any](r *http.Request, dest *T) error {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&dest)
