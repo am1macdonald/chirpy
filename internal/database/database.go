@@ -32,16 +32,22 @@ func (u *User) Validate(password string) bool {
 	return err == nil
 }
 
-func (u *User) GetToken(secret string, expiresIn int) (string, error) {
-	var expiry time.Time
-	if expiresIn == 0 || (time.Duration(time.Second*time.Duration(expiresIn)) > time.Duration(time.Hour*24)) {
-		expiry = time.Now().Add(time.Duration(time.Hour * 24))
-	} else {
-		expiry = time.Now().Add(time.Duration(expiresIn))
-	}
+func (u *User) GetAccessToken(secret string) (string, error) {
+	expiry := time.Now().Add(time.Duration(time.Hour * 1))
 	claims := &jwt.RegisteredClaims{
 		ExpiresAt: jwt.NewNumericDate(expiry),
-		Issuer:    "chirpy",
+		Issuer:    "chirpy-access",
+		IssuedAt:  jwt.NewNumericDate(time.Now()),
+		Subject:   strconv.Itoa(u.ID),
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
+}
+
+func (u *User) GetRefreshToken(secret string) (string, error) {
+	expiry := time.Now().Add(time.Duration(time.Hour * 24 * 60))
+	claims := &jwt.RegisteredClaims{
+		ExpiresAt: jwt.NewNumericDate(expiry),
+		Issuer:    "chirpy-refresh",
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		Subject:   strconv.Itoa(u.ID),
 	}
