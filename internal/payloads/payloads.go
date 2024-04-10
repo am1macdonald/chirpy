@@ -31,8 +31,6 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	ID           int    `json:"id"`
-	Email        string `json:"email"`
 	Token        string `json:"token"`
 	RefreshToken string `json:"refresh_token"`
 }
