@@ -69,8 +69,9 @@ type DB struct {
 }
 
 type DBStructure struct {
-	Chirps map[int]Chirp `json:"chirps"`
-	Users  map[int]User  `json:"users"`
+	Chirps        map[int]Chirp       `json:"chirps"`
+	Users         map[int]User        `json:"users"`
+	RevokedTokens map[string]struct{} `json:"revoked_tokens"`
 }
 
 func (db *DB) ensureDB() error {
@@ -223,6 +224,32 @@ func (db *DB) UpdateUser(id int, u *User) (*User, error) {
 		return nil, err
 	}
 	return u, nil
+}
+
+func (db *DB) RevokeTokens(token string) error {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return err
+	}
+	dbs.RevokedTokens[token] = struct{}{}
+	err = db.writeDB(*dbs)
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
+func (db *DB) ValidateToken(token string) (bool, error) {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return false, err
+	}
+	_, ok := dbs.RevokedTokens[token]
+	if ok {
+		return false, nil
+	}
+	return true, nil
 }
 
 func NewDB() (*DB, error) {
