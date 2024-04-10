@@ -48,6 +48,15 @@ func (u *User) GetToken(secret string, expiresIn int) (string, error) {
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secret))
 }
 
+func (u *User) UpdatePassword(password string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), 4)
+	if err != nil {
+		return err
+	}
+	u.Password = string(hash)
+	return nil
+}
+
 type DB struct {
 	path string
 	mu   sync.Mutex
