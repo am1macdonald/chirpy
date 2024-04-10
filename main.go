@@ -206,7 +206,8 @@ func main() {
 		token, err := jwt.ParseWithClaims(ts, claims, func(t *jwt.Token) (interface{}, error) {
 			return []byte(config.jwtSecret), nil
 		})
-		if err != nil {
+		issuer, err := claims.GetIssuer()
+		if err != nil || issuer == "chirpy-refresh" {
 			log.Println(err.Error())
 			jsonResponse(w, 401, "invalid token")
 			return
