@@ -274,16 +274,24 @@ func main() {
 			jsonResponse(w, 401, "Invalid password")
 			return
 		}
-		token, err := user.GetToken(config.jwtSecret, req.ExpiresInSeconds)
+		accessToken, err := user.GetAccessToken(config.jwtSecret)
 		if err != nil {
 			log.Printf("%v", err)
-			jsonResponse(w, 500, "Failed to generate token")
+			jsonResponse(w, 500, "Failed to generate access token")
 			return
 		}
+		refreshToken, err := user.GetRefreshToken(config.jwtSecret)
+		if err != nil {
+			log.Printf("%v", err)
+			jsonResponse(w, 500, "Failed to generate refresh token")
+			return
+		}
+
 		pl := payloads.LoginResponse{
-			ID:    user.ID,
-			Email: user.Email,
-			Token: token,
+			ID:           user.ID,
+			Email:        user.Email,
+			Token:        accessToken,
+			RefreshToken: refreshToken,
 		}
 		log.Println("Here")
 		jsonResponse(w, 200, pl)
