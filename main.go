@@ -199,6 +199,7 @@ func main() {
 		ts := r.Header.Get("Authorization")
 		if ts == "" {
 			jsonResponse(w, 401, "Authorization header is required")
+			return
 		}
 		ts = strings.Split(ts, " ")[1]
 		log.Println(ts)
@@ -208,7 +209,7 @@ func main() {
 		})
 		issuer, err := claims.GetIssuer()
 		if err != nil || issuer == "chirpy-refresh" {
-			log.Println(err.Error())
+			log.Println("Invalid token")
 			jsonResponse(w, 401, "invalid token")
 			return
 		}
@@ -232,10 +233,12 @@ func main() {
 		err = user.UpdatePassword(req.Password)
 		if err != nil {
 			jsonResponse(w, 500, "failed to update password")
+			return
 		}
 		user, err = db.UpdateUser(idInt, user)
 		if err != nil {
 			jsonResponse(w, 500, "Could not update user")
+			return
 		}
 		pl := payloads.CreateUserResponse{
 			ID:    user.ID,
@@ -287,15 +290,62 @@ func main() {
 			jsonResponse(w, 500, "Failed to generate refresh token")
 			return
 		}
-
 		pl := payloads.LoginResponse{
-			ID:           user.ID,
-			Email:        user.Email,
 			Token:        accessToken,
 			RefreshToken: refreshToken,
 		}
 		log.Println("Here")
 		jsonResponse(w, 200, pl)
+	})
+
+	mux.HandleFunc("POST /api/refresh", func(w http.ResponseWriter, r *http.Request) {
+		ts := r.Header.Get("Authorization")
+		if ts == "" {
+			jsonResponse(w, 401, "Authorization header is required")
+			return
+		}
+		ts = strings.Split(ts, " ")[1]
+		log.Println(ts)
+		claims := jwt.MapClaims{}
+		token, err := jwt.ParseWithClaims(ts, claims, func(t *jwt.Token) (interface{}, error) {
+			return []byte(config.jwtSecret), nil
+		})
+		if err != nil {
+			log.Println(err.Error())
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		issuer, err := claims.GetIssuer()
+		if err != nil || issuer != "chirpy-refresh" {
+			log.Println(err.Error())
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		userID, err := token.Claims.GetSubject()
+		if err != nil {
+			jsonResponse(w, 500, "no claims subject")
+			return
+		}
+		idInt, err := strconv.Atoi(userID)
+		if err != nil {
+			jsonResponse(w, 500, "failed to parse userID")
+			return
+		}
+		user, err := db.GetUser(idInt)
+		if err != nil {
+			log.Println("No user with id")
+			jsonResponse(w, 404, "User with id does not exist")
+			return
+		}
+		accessToken, err := user.GetAccessToken(config.jwtSecret)
+		if err != nil {
+			log.Println("Failed to refresh access token")
+			jsonResponse(w, 500, "failed to refresh access token")
+		}
+		jsonResponse(w, 200, map[string]string{
+			"token": accessToken,
+		})
+
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
