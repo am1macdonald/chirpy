@@ -37,6 +37,12 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+type UpdateRequest struct {
+	ID       int    `json:"id"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 func DecodeRequest[T any](r *http.Request, dest *T) error {
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&dest)
