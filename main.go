@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
+	"github.com/am1macdonald/chirpy/internal/chirps"
 	"github.com/am1macdonald/chirpy/internal/database"
 	"github.com/am1macdonald/chirpy/internal/payloads"
-	"github.com/am1macdonald/chirpy/internal/validate"
+	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/joho/godotenv"
 )
 
 var mux http.ServeMux
@@ -25,6 +30,7 @@ var db *database.DB
 
 type apiConfig struct {
 	fileServerHits int
+	jwtSecret      string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -69,7 +75,12 @@ func errorResponse(w http.ResponseWriter, code int, msg string) {
 }
 
 func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
 	config = apiConfig{}
+	config.jwtSecret = os.Getenv("JWT_SECRET")
 	mux = *http.NewServeMux()
 	corsMux = middlewareCors(&mux)
 	server = http.Server{}
@@ -116,25 +127,6 @@ func main() {
 		w.Write([]byte("OK"))
 	})
 
-	// mux.HandleFunc("POST /api/validate_chirp", func(w http.ResponseWriter, r *http.Request) {
-	// 	req, err := payloads.DecodeRequest(r)
-	// 	if err != nil {
-	// 		errorResponse(w, 500, "failed to decode the request")
-	// 		return
-	// 	}
-	// 	res := payloads.ResponsePayload{}
-	// 	s, err := validate.Validate(req.Body)
-	// 	if err != nil {
-	// 		res.Body = s
-	// 		jsonResponse(w, 400, res)
-	// 		return
-	// 	} else {
-	// 		res.CleanedBody = s
-	// 	}
-	// 	jsonResponse(w, 200, res)
-	// })
-	//
-
 	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
 		req := payloads.ChripPostBody{}
 		err := payloads.DecodeRequest(r, &req)
@@ -142,7 +134,7 @@ func main() {
 			errorResponse(w, 500, "failed to decode the request")
 			return
 		}
-		s, err := validate.Validate(req.Body)
+		s, err := chirps.Validate(req.Body)
 		if err != nil {
 			jsonResponse(w, 400, err.Error())
 			return
@@ -150,6 +142,7 @@ func main() {
 		chirp, err := db.CreateChirp(s)
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		jsonResponse(w, 201, chirp)
 	})
@@ -158,6 +151,7 @@ func main() {
 		chirps, err := db.GetChirps()
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		jsonResponse(w, 200, chirps)
 	})
@@ -166,10 +160,12 @@ func main() {
 		id, err := strconv.Atoi(r.PathValue("chirp_id"))
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		chirp, err := db.GetChirp(id)
 		if err != nil {
 			jsonResponse(w, 404, err.Error())
+			return
 		}
 		jsonResponse(w, 200, chirp)
 	})
@@ -179,10 +175,12 @@ func main() {
 		err := payloads.DecodeRequest(r, &req)
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		user, err := db.CreateUser(req.Email, req.Password)
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		pl := payloads.CreateUserResponse{
 			ID:    user.ID,
@@ -191,16 +189,104 @@ func main() {
 		jsonResponse(w, 201, pl)
 	})
 
+	mux.HandleFunc("PUT /api/users", func(w http.ResponseWriter, r *http.Request) {
+		req := payloads.UpdateRequest{}
+		err := payloads.DecodeRequest(r, &req)
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+			return
+		}
+		ts := r.Header.Get("Authorization")
+		if ts == "" {
+			jsonResponse(w, 401, "Authorization header is required")
+		}
+		ts = strings.Split(ts, " ")[1]
+		log.Println(ts)
+		claims := jwt.MapClaims{}
+		token, err := jwt.ParseWithClaims(ts, claims, func(t *jwt.Token) (interface{}, error) {
+			return []byte(config.jwtSecret), nil
+		})
+		if err != nil {
+			log.Println(err.Error())
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		userID, err := token.Claims.GetSubject()
+		if err != nil {
+			jsonResponse(w, 500, "no claims subject")
+			return
+		}
+		idInt, err := strconv.Atoi(userID)
+		if err != nil {
+			jsonResponse(w, 500, "failed to parse userID")
+			return
+		}
+		user, err := db.GetUser(idInt)
+		if err != nil {
+			log.Println("No user with id")
+			jsonResponse(w, 404, "User with id does not exist")
+			return
+		}
+		user.Email = req.Email
+		err = user.UpdatePassword(req.Password)
+		if err != nil {
+			jsonResponse(w, 500, "failed to update password")
+		}
+		user, err = db.UpdateUser(idInt, user)
+		if err != nil {
+			jsonResponse(w, 500, "Could not update user")
+		}
+		pl := payloads.CreateUserResponse{
+			ID:    user.ID,
+			Email: user.Email,
+		}
+		jsonResponse(w, 200, pl)
+	})
+
 	mux.HandleFunc("GET /api/users/{user_id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.Atoi(r.PathValue("user_id"))
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
+			return
 		}
 		chirp, err := db.GetUser(id)
 		if err != nil {
 			jsonResponse(w, 404, err.Error())
+			return
 		}
 		jsonResponse(w, 200, chirp)
+	})
+
+	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
+		req := payloads.LoginRequest{}
+		err := payloads.DecodeRequest(r, &req)
+		if err != nil {
+			jsonResponse(w, 500, err.Error())
+			return
+		}
+		user, err := db.GetUserByEmail(req.Email)
+		if err != nil {
+			jsonResponse(w, 400, err.Error())
+			return
+		}
+		valid := user.Validate(req.Password)
+		if !valid {
+			jsonResponse(w, 401, "Invalid password")
+			return
+		}
+		token, err := user.GetToken(config.jwtSecret, req.ExpiresInSeconds)
+		if err != nil {
+			log.Printf("%v", err)
+			jsonResponse(w, 500, "Failed to generate token")
+			return
+		}
+		pl := payloads.LoginResponse{
+			ID:    user.ID,
+			Email: user.Email,
+			Token: token,
+		}
+		log.Println("Here")
+		jsonResponse(w, 200, pl)
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
