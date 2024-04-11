@@ -71,6 +71,7 @@ type DB struct {
 
 type DBStructure struct {
 	Chirps        map[int]Chirp        `json:"chirps"`
+	ChirpSeq      int                  `json:"chirp_seq"`
 	Users         map[int]User         `json:"users"`
 	RevokedTokens map[string]time.Time `json:"revoked_tokens"`
 }
@@ -84,6 +85,7 @@ func (db *DB) ensureDB() error {
 		}
 		err = db.writeDB(DBStructure{
 			Chirps:        map[int]Chirp{},
+			ChirpSeq:      1,
 			Users:         map[int]User{},
 			RevokedTokens: map[string]time.Time{},
 		})
@@ -130,15 +132,29 @@ func (db *DB) CreateChirp(body string, author int) (*Chirp, error) {
 	}
 	chirp := Chirp{
 		Body:     body,
-		ID:       len(dbs.Chirps) + 1,
+		ID:       dbs.ChirpSeq,
 		AuthorID: author,
 	}
+	dbs.ChirpSeq += 1
 	dbs.Chirps[chirp.ID] = chirp
 	err = db.writeDB(*dbs)
 	if err != nil {
 		return nil, err
 	}
 	return &chirp, nil
+}
+
+func (db *DB) DeleteChirp(id int) bool {
+	dbs, err := db.loadDB()
+	if err != nil {
+		return false
+	}
+	delete(dbs.Chirps, id)
+	err = db.writeDB(*dbs)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (db *DB) GetChirps() ([]Chirp, error) {
