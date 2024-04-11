@@ -69,9 +69,9 @@ type DB struct {
 }
 
 type DBStructure struct {
-	Chirps        map[int]Chirp       `json:"chirps"`
-	Users         map[int]User        `json:"users"`
-	RevokedTokens map[string]struct{} `json:"revoked_tokens"`
+	Chirps        map[int]Chirp        `json:"chirps"`
+	Users         map[int]User         `json:"users"`
+	RevokedTokens map[string]time.Time `json:"revoked_tokens"`
 }
 
 func (db *DB) ensureDB() error {
@@ -82,8 +82,9 @@ func (db *DB) ensureDB() error {
 			return err
 		}
 		err = db.writeDB(DBStructure{
-			Chirps: map[int]Chirp{},
-			Users:  map[int]User{},
+			Chirps:        map[int]Chirp{},
+			Users:         map[int]User{},
+			RevokedTokens: map[string]time.Time{},
 		})
 		if err != nil {
 			return err
@@ -226,12 +227,12 @@ func (db *DB) UpdateUser(id int, u *User) (*User, error) {
 	return u, nil
 }
 
-func (db *DB) RevokeTokens(token string) error {
+func (db *DB) RevokeToken(token string) error {
 	dbs, err := db.loadDB()
 	if err != nil {
 		return err
 	}
-	dbs.RevokedTokens[token] = struct{}{}
+	dbs.RevokedTokens[token] = time.Now()
 	err = db.writeDB(*dbs)
 	if err != nil {
 		return err
