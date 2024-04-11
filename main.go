@@ -316,9 +316,25 @@ func main() {
 			return
 		}
 		issuer, err := claims.GetIssuer()
-		if err != nil || issuer != "chirpy-refresh" {
+		if err != nil {
 			log.Println(err.Error())
 			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		if issuer != "chirpy-refresh" {
+			log.Println("not a chirpy refresh token")
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		ok, err := db.ValidateToken(ts)
+		if err != nil {
+			log.Println("failed to validate token")
+			jsonResponse(w, 500, "failed to validate token")
+			return
+		}
+		if !ok {
+			log.Println("token is invalid")
+			jsonResponse(w, 401, "token is invalid")
 			return
 		}
 		userID, err := token.Claims.GetSubject()
@@ -341,11 +357,48 @@ func main() {
 		if err != nil {
 			log.Println("Failed to refresh access token")
 			jsonResponse(w, 500, "failed to refresh access token")
+			return
 		}
 		jsonResponse(w, 200, map[string]string{
 			"token": accessToken,
 		})
+	})
 
+	mux.HandleFunc("POST /api/revoke", func(w http.ResponseWriter, r *http.Request) {
+		ts := r.Header.Get("Authorization")
+		if ts == "" {
+			jsonResponse(w, 401, "Authorization header is required")
+			return
+		}
+		ts = strings.Split(ts, " ")[1]
+		log.Println(ts)
+		claims := jwt.MapClaims{}
+		_, err := jwt.ParseWithClaims(ts, claims, func(t *jwt.Token) (interface{}, error) {
+			return []byte(config.jwtSecret), nil
+		})
+		if err != nil {
+			log.Println(err.Error())
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		issuer, err := claims.GetIssuer()
+		if err != nil {
+			log.Println(err.Error())
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		if issuer != "chirpy-refresh" {
+			log.Println("not a chirpy refresh token")
+			jsonResponse(w, 401, "invalid token")
+			return
+		}
+		err = db.RevokeToken(ts)
+		if err != nil {
+			log.Println("Failed to revoke refresh token")
+			jsonResponse(w, 500, "failed to revoke refresh token")
+			return
+		}
+		jsonResponse(w, 200, "success")
 	})
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
