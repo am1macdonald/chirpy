@@ -450,6 +450,8 @@ func main() {
 		jsonResponse(w, 200, "success")
 	})
 
+	mux.HandleFunc("DELETE /api/chirps/{chirp_id}", config.HandleDeleteChirp)
+
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
 	server.ListenAndServe()
 }
