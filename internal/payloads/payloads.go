@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-type ChripPostBody struct {
+type ChirpPostBody struct {
 	Body string `json:"body"`
 }
 
