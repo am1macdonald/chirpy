@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -68,9 +69,9 @@ func jsonResponse(w http.ResponseWriter, code int, payload interface{}) {
 	w.Write(data)
 }
 
-func errorResponse(w http.ResponseWriter, code int, msg string) {
+func errorResponse(w http.ResponseWriter, code int, err error) {
 	w.WriteHeader(code)
-	w.Write([]byte(msg))
+	w.Write([]byte(err.Error()))
 	return
 }
 
@@ -91,6 +92,34 @@ func init() {
 		log.Fatalln("Failed to load database")
 	}
 	db = dbp
+}
+
+func getTokenString(r *http.Request) (string, error) {
+	ts := r.Header.Get("Authorization")
+	if ts == "" {
+		return "", errors.New("Authorization header is required")
+	}
+	return strings.Split(ts, " ")[1], nil
+
+}
+
+func parseTokenString(t string) (*jwt.Token, error) {
+	claims := jwt.MapClaims{}
+	return jwt.ParseWithClaims(t, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(config.jwtSecret), nil
+	})
+}
+
+func getUserFromToken(t jwt.Token) (*database.User, error) {
+	userID, err := t.Claims.GetSubject()
+	if err != nil {
+		return nil, err
+	}
+	idInt, err := strconv.Atoi(userID)
+	if err != nil {
+		return nil, err
+	}
+	return db.GetUser(idInt)
 }
 
 func main() {
@@ -128,18 +157,39 @@ func main() {
 	})
 
 	mux.HandleFunc("POST /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		req := payloads.ChripPostBody{}
-		err := payloads.DecodeRequest(r, &req)
+		ts, err := getTokenString(r)
 		if err != nil {
-			errorResponse(w, 500, "failed to decode the request")
+			errorResponse(w, 500, err)
+			return
+		}
+		token, err := parseTokenString(ts)
+		if err != nil {
+			errorResponse(w, 500, err)
+			return
+		}
+		issuer, err := token.Claims.GetIssuer()
+		if err != nil || issuer != "chirpy-access" {
+			log.Println("Invalid token")
+			errorResponse(w, 401, errors.New("invalid token"))
+			return
+		}
+		user, err := getUserFromToken(*token)
+		if err != nil {
+			errorResponse(w, 500, err)
+			return
+		}
+		req := payloads.ChirpPostBody{}
+		err = payloads.DecodeRequest(r, &req)
+		if err != nil {
+			errorResponse(w, 500, err)
 			return
 		}
 		s, err := chirps.Validate(req.Body)
 		if err != nil {
-			jsonResponse(w, 400, err.Error())
+			errorResponse(w, 400, err)
 			return
 		}
-		chirp, err := db.CreateChirp(s)
+		chirp, err := db.CreateChirp(s, user.ID)
 		if err != nil {
 			jsonResponse(w, 500, err.Error())
 			return
@@ -371,7 +421,6 @@ func main() {
 			return
 		}
 		ts = strings.Split(ts, " ")[1]
-		log.Println(ts)
 		claims := jwt.MapClaims{}
 		_, err := jwt.ParseWithClaims(ts, claims, func(t *jwt.Token) (interface{}, error) {
 			return []byte(config.jwtSecret), nil
