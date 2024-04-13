@@ -23,9 +23,10 @@ type Chirp struct {
 }
 
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	ID          int    `json:"id"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	IsChirpyRed bool   `json:"is_chirpy_red"`
 }
 
 func (u *User) Validate(password string) bool {
@@ -195,9 +196,10 @@ func (db *DB) CreateUser(email string, password string) (*User, error) {
 		return nil, err
 	}
 	user = &User{
-		Email:    email,
-		ID:       len(dbs.Users) + 1,
-		Password: string(hash),
+		Email:       email,
+		ID:          len(dbs.Users) + 1,
+		Password:    string(hash),
+		IsChirpyRed: false,
 	}
 	dbs.Users[user.ID] = *user
 	err = db.writeDB(*dbs)
@@ -232,12 +234,12 @@ func (db *DB) GetUserByEmail(email string) (*User, error) {
 	return nil, errors.New("User not found")
 }
 
-func (db *DB) UpdateUser(id int, u *User) (*User, error) {
+func (db *DB) UpdateUser(u *User) (*User, error) {
 	dbs, err := db.loadDB()
 	if err != nil {
 		return nil, err
 	}
-	dbs.Users[id] = *u
+	dbs.Users[*&u.ID] = *u
 	err = db.writeDB(*dbs)
 	if err != nil {
 		return nil, err
