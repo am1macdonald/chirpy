@@ -32,6 +32,7 @@ var db *database.DB
 type apiConfig struct {
 	fileServerHits int
 	jwtSecret      string
+	polkaKey       string
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -82,6 +83,7 @@ func init() {
 	}
 	config = apiConfig{}
 	config.jwtSecret = os.Getenv("JWT_SECRET")
+	config.polkaKey = os.Getenv("POLKA_API_KEY")
 	mux = *http.NewServeMux()
 	corsMux = middlewareCors(&mux)
 	server = http.Server{}
@@ -197,14 +199,7 @@ func main() {
 		jsonResponse(w, 201, chirp)
 	})
 
-	mux.HandleFunc("GET /api/chirps", func(w http.ResponseWriter, r *http.Request) {
-		chirps, err := db.GetChirps()
-		if err != nil {
-			jsonResponse(w, 500, err.Error())
-			return
-		}
-		jsonResponse(w, 200, chirps)
-	})
+	mux.HandleFunc("GET /api/chirps", config.GetChirpsHandler)
 
 	mux.HandleFunc("GET /api/chirps/{chirp_id}", func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.Atoi(r.PathValue("chirp_id"))
@@ -233,8 +228,9 @@ func main() {
 			return
 		}
 		pl := payloads.CreateUserResponse{
-			ID:    user.ID,
-			Email: user.Email,
+			ID:          user.ID,
+			Email:       user.Email,
+			IsChirpyRed: user.IsChirpyRed,
 		}
 		jsonResponse(w, 201, pl)
 	})
@@ -285,7 +281,7 @@ func main() {
 			jsonResponse(w, 500, "failed to update password")
 			return
 		}
-		user, err = db.UpdateUser(idInt, user)
+		user, err = db.UpdateUser(user)
 		if err != nil {
 			jsonResponse(w, 500, "Could not update user")
 			return
@@ -341,6 +337,9 @@ func main() {
 			return
 		}
 		pl := payloads.LoginResponse{
+			Email:        user.Email,
+			ID:           user.ID,
+			IsChirpyRed:  user.IsChirpyRed,
 			Token:        accessToken,
 			RefreshToken: refreshToken,
 		}
@@ -451,6 +450,8 @@ func main() {
 	})
 
 	mux.HandleFunc("DELETE /api/chirps/{chirp_id}", config.HandleDeleteChirp)
+
+	mux.HandleFunc("POST /api/polka/webhooks", config.HandlePolkaWebhook)
 
 	fmt.Printf("Server listening at host http://localhost%v\n", port)
 	server.ListenAndServe()
